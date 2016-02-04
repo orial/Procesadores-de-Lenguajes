@@ -2,7 +2,7 @@ import java_cup.runtime.*;
 
 %%
 
-// Code (label handling)
+// Codigo (manejo de etiquetas)
 
 %{
 	public String newLabel(){
@@ -10,14 +10,14 @@ import java_cup.runtime.*;
 	}
 %}
 
-//  Declarations
+//  Declaraciones
    
 %cup
 
 LineTerminator = \r|\n|\r\n
 InputCharacter = [^\r\n]
 
-/* Comments */
+/* Comentarios */
 Comment = {TraditionalComment} | {EndOfLineComment} | {DocumentationComment} | {HashComment}
 
 TraditionalComment 	= "/*" [^*] ~"*/" | "/*" "*"+ "/"
@@ -27,46 +27,46 @@ HashComment		= "#" {InputCharacter}* {LineTerminator}
 
 %%   
 
-// Expresions and rules
+// Expresiones y Reglas
 
-// Operators
+// Operadores
     "+"                         { return new Symbol(sym.MAS); }
     "-"                         { return new Symbol(sym.MENOS); }
     "*"                         { return new Symbol(sym.POR); }
     "/"                         { return new Symbol(sym.DIV); }
-// Precedence
+// Precedencia y Bloques
     "("                         { return new Symbol(sym.AP); }
     ")"                         { return new Symbol(sym.CP); }
     "{"                         { return new Symbol(sym.ALL); }
     "}"                         { return new Symbol(sym.CLL); }
-// Delimiter
+// Delimitador
     ";"                         { return new Symbol(sym.PYC); }
-// Assignations
+// Asignaciones
     "="                         { return new Symbol(sym.ASIG); }
-// Comparisons
+// Comparaciones
     "=="                        { return new Symbol(sym.EQ); }
     "!="                        { return new Symbol(sym.NEQ); }
     "<"                         { return new Symbol(sym.LOW); }
     "<="                        { return new Symbol(sym.LOE); }
     ">"                         { return new Symbol(sym.GRE); }
     ">="                        { return new Symbol(sym.GOE); }
-// Logical
+// Logicos
     "!"                         { return new Symbol(sym.NOT); }
     "&&"                        { return new Symbol(sym.AND); }
     "||"                        { return new Symbol(sym.OR); }
-// Code
+// Codigo
     "if"                        { return new Symbol(sym.IF, newLabel()); }
     "else"                      { return new Symbol(sym.ELSE); }
     "while"                     { return new Symbol(sym.WHILE, newLabel()); }
     "do"                        { return new Symbol(sym.DO, newLabel()); }
     "for"                       { return new Symbol(sym.FOR, newLabel()); }
     "print"                     { return new Symbol(sym.PRINT); }
-// Numbers
+// Numeros
     0|[1-9][0-9]*               { return new Symbol(sym.ENTERO, new Integer(yytext()) ); }
-// Comments
+// Comentarios
     {Comment}                   { }
-// Identifiers
+// Identificadores
     [_a-zA-Z$][_a-zA-Z0-9$]*    { return new Symbol(sym.IDENT, yytext()); }
-// Others
+// Otros
     \ |\t\f                     {  }
     [^]                         { /*throw new Error("Illegal character <"+yytext()+">");*/ }
