@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# Usage: `./runtest` will run all the tests under the `test` directory
+#		 `./runtest test/NAME.pl` will run only the given test
+
+passed_test=0;
+
+# $1 path to the exercise
+# $2 counter if any
+correct_exercise () {
+
+	# Compile solution
+	bin/jplc $1 solution.j;
+	# Compile exercise
+	java -cp bin:../lib/java-cup-11b-runtime.jar JPLC $1 exercise.j;
+	# Run solution and execute
+	solution=`./jpl solution 1`;
+	# Run jasmin on exercise and execute
+	exercise=`./jpl exercise 1`;
+	name=$(basename "$1")
+	# Remove files
+	rm -f solution.j exercise.j;
+
+	if [[ $solution == $exercise ]]
+	then
+		echo "${2-1}. ${name} Ok!";
+		passed_test=$((passed_test+1));
+	else 
+		echo "${2-1}. ${name} ERROR! Expected: ${solution} Given: ${exercise}";
+	fi
+}
+
+if [ $1 ]
+then
+	correct_exercise $1;
+else
+	count=0;
+
+	for filename in test/*;
+	do
+		correct_exercise $filename $count;
+
+		count=$((count+1));
+	done
+
+	echo "Nº of Ok!: ${passed_test}/${count}";
+fi
+
+
