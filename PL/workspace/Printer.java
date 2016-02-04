@@ -8,7 +8,7 @@ public class Printer {
 
 	// Creates temporary variables (String tag)
 	private String newTmp(){
-		return Generador.getInstance().newTmp();
+		return Generador.getInstance().newVarTemp();
 	}
 
 	/**

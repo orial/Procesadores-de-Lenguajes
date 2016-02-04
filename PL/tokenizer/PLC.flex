@@ -6,7 +6,7 @@ import java_cup.runtime.*;
 
 %{
 	public String newLabel(){
-		return Generator.getInstance().newLabel();
+		return Generador.getInstance().newLabel();
 	}
 %}
 

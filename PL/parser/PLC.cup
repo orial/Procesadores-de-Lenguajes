@@ -5,7 +5,7 @@ import java_cup.runtime.*;
 action code {:
 	Printer p = new Printer();
 
-	public String newLabel(){ return Generator.getInstance().newLabel(); }
+	public String newLabel(){ return Generador.getInstance().newLabel(); }
 :}
 
 /*Terminals */
