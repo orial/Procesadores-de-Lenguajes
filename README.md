@@ -1,9 +1,8 @@
-Language Processors
-===================
+Procesadores de Lenguajes
+=========================
 
-Personal work on the subject of language Processors. Contains original exercises, test cases and reference binaries (none of these made by me).
+Trabajo modificado para la Asignatura Procesadores de Lenguajes basado en el trabajo de soutoner (https://github.com/soutoner)
 
----
 
 ### Content:
 
