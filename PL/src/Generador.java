@@ -1,6 +1,6 @@
 import java.io.PrintStream;
 
-public class Generador {
+public class Generador { // hecho con patron Singleton
 
     private static Generador instance;
     // salida to print (can be System.out or a file)
@@ -13,7 +13,6 @@ public class Generador {
     public static synchronized Generador getInstance() {
         if (instance == null)
             instance = new Generador();
-
         return instance;
     }
 
