@@ -1,5 +1,13 @@
 import java_cup.runtime.*;
 
+parser code {:
+    @Override
+    public void report_error(String message, Object info){      // Syntax error handling message
+        Generador.error();
+	    Generador.halt();
+    }
+:}
+
 /*Terminales */
 
 terminal            MAS, MENOS, POR, DIV, ASIG, MENOSUNARIO, NOT;
@@ -18,6 +26,13 @@ terminal     String DO;
 terminal     String WHILE;
 terminal     String FOR;
 
+terminal 		    INT;
+terminal 		    AC, CC, COMA;
+terminal    String	TO, STEP, DOWNTO;
+terminal 		    MASMAS;
+terminal 		    MENOSMENOS;
+terminal 			MOD;
+
 /* Non terminales */
 
 non terminal        lista_de_sent;
@@ -26,10 +41,16 @@ non terminal String expresion;
 non terminal    Tag cond; 
 non terminal        elsePart;
 
+non terminal 		listaDec;
+non terminal 		dec;
+non terminal String stepPart;
+
 /* Precedencia */
 
+precedence  left COMA; 				//nuevo
+precedence right ASIG; 				//nuevo
 precedence  left MAS, MENOS;
-precedence  left POR, DIV;
+precedence  left POR, DIV, MOD; 	//mod nuevo
 precedence  left MENOSUNARIO;
 precedence  left AND, OR;
 precedence  left IF;
@@ -38,14 +59,15 @@ precedence right NOT;
 
 /* Gramatica */
 
-lista_de_sent       ::= 	sentencia
+lista_de_sent       ::= sentencia
 			       	|  	lista_de_sent sentencia
 			        ;
 sentencia		   ::= 	expresion:e PYC                 	{: :}
           // PRINT
 	 				|	PRINT AP expresion:e CP PYC		    {: Generador.print(e); :}
 	 	  // Anonymous block
-	 				|	AK lista_de_sent CK			        {: :}
+	 				|	AK 			            			{: Var.upLevel(); :}
+			    		lista_de_sent CK    				{: Var.clear(Var.getLevel()); Var.downLevel(); :}
 		  // IF - ELSE (optional)
 					|	IF:finIf AP cond:c CP            	{: Generador.label(c.getV()); :}	
                         sentencia                           {: Generador.goTo(finIf); Generador.label(c.getF()); :}       
@@ -62,21 +84,90 @@ sentencia		   ::= 	expresion:e PYC                 	{: :}
 			            cond:c1 PYC	                		{: RESULT = Generador.getTag();	Generador.label(RESULT.toString()); :}
 			            expresion:e2 CP	            		{: Generador.goTo(inFor); Generador.label(c1.getV()); :}
 			            sentencia	            			{: Generador.goTo(RESULT.toString()); Generador.label(c1.getF()); :}
+		// FOR PASCAL
+          // FOR TO
+					| 	FOR:tagFor expresion:e1   			{: :}
+		    			TO:tagTo expresion:e2  				{: Generador.label(tagFor); RESULT = Generador.condition(e2, Tag.MEQ, e1); Generador.label(tagTo); :}
+    					stepPart:p DO	    				{: 
+                                               					Generador.assignment(Var.getVar(e1), e1 + " + " + p); 
+                                               					Generador.goTo(tagFor); 
+                                               					Generador.label(((Tag)RESULT).getF());
+							                				:}	
+			    		sentencia	        					{: Generador.goTo(tagTo); Generador.label(((Tag)RESULT).getV()); :}
+		  // FOR DOWNTO
+					| 	FOR:tagFor expresion:e1	   			{: :}
+		    			DOWNTO:tagD expresion:e2	   		{: Generador.label(tagFor); RESULT = Generador.condition(e1, Tag.MEQ, e2); Generador.label(tagD); :}
+			    		stepPart:p DO			    		{:
+			                                   					Generador.assignment(Var.getVar(e1), e1 + " - " + p);
+                                               					Generador.goTo(tagFor);
+                                               					Generador.label(((Tag)RESULT).getF());
+							                				:}
+			    		sentencia				        	{: Generador.goTo(tagD); Generador.label(((Tag)RESULT).getV()); :}
+	 	  // Declarations
+	 				| 	INT listaDec PYC
 	 				;
 elsePart 	       ::= 	ELSE sentencia                      %prec ELSE
 	   	            |  /* EPSILON */                      	%prec IF
-	   	             ;
+	   	            ;
+stepPart		   ::=	STEP expresion:e1	        		{: RESULT = e1; :}
+	         		|  /* EPSILON */         				{: RESULT = "1"; :}
+		     		;
+		  // List of declarations
+listaDec		   ::=	dec
+		     		|	listaDec COMA dec
+		     		;
+dec		    	   ::=	IDENT:i ASIG expresion:e1			{: Var.addVar(i, Var.getLevel()); Generador.assignment(Var.getVar(i), e1); :}
+		     		|	IDENT:i	        					{: Var.addVar(i, Var.getLevel()); :}
+	         		;
 expresion   	   ::=	expresion:e1 MAS expresion:e2       {: RESULT = Generador.aritmetica(e1 + " + " + e2); :}		
 		            |	expresion:e1 MENOS expresion:e2     {: RESULT = Generador.aritmetica(e1 + " - " + e2); :}
 		            |	expresion:e1 POR expresion:e2       {: RESULT = Generador.aritmetica(e1 + " * " + e2); :}
 		            | 	expresion:e1 DIV expresion:e2       {: RESULT = Generador.aritmetica(e1 + " / " + e2); :}
+		            |	expresion:e1 MOD expresion:e2   	{: // nuevo MOD
+				                               					String t1 = Generador.arithmetic(e1 + " / " + e2);
+								               					String t2 = Generador.arithmetic(t1 + " * " + e2);
+								               					RESULT = Generador.arithmetic(e1 + " - " + t2);
+							                				:}
 		            | 	MENOS expresion:e		            {: RESULT = Generador.aritmetica(" -" + e); :}                 %prec MENOSUNARIO
 		            | 	AP expresion:e CP	                {: RESULT = e; :}       
-                    |	IDENT:i ASIG expresion:e		    {: RESULT = Generador.asignacion(i, e); :}
-                    |	IDENT:i			                	{: RESULT = i; :}
+                    |	IDENT:i ASIG expresion:e		    {: //usando T.simb	
+								               					if(Var.exists(i)){
+									               				RESULT = Generador.asignacion(Var.getVar(i), e);
+								               					}
+								               					else{
+									               					Generador.error();
+									               					Generador.halt();
+								               					}
+							                				:}
+                    |	IDENT:i			                	{: //usando T.simb	
+								               					if(Var.exists(i)){
+									               				RESULT = Var.getVar(i);
+								               					}
+								               					else{
+									               					Generador.error();
+									               					Generador.halt();
+								               					}
+							                				:}
                     |  	NUMERO:n                            {: RESULT = n.toString(); :}
                     |	NUMEROF:n			                {: RESULT = n.toString(); :}
+          // PRE y POST INCR 
+                   	|	MASMAS IDENT:i1						{: RESULT = Generador.assignment(Var.getVar(i1), Var.getVar(i1) + " + " + "1"); :}
+		     		|	IDENT:i1 MASMAS						{:
+								               					String temp = Generador.getTemp();
+								               					Generador.assignment(temp, Var.getVar(i1));
+								               					Generador.assignment(Var.getVar(i1), Var.getVar(i1) + " + " + "1");
+								               					RESULT = temp;
+							                				:}
+		  // PRE y POST DECRE
+					|	MENOSMENOS IDENT:i1					{: RESULT = Generador.assignment(Var.getVar(i1), Var.getVar(i1) + " - " + "1"); :}
+		     		|	IDENT:i1 MENOSMENOS					{:
+								               					String temp = Generador.getTemp();
+                                               					Generador.assignment(temp, Var.getVar(i1));
+                                               					Generador.assignment(Var.getVar(i1), Var.getVar(i1) + " - " + "1");
+                                               					RESULT = temp;
+							                				:}		
                     ;
+          
 cond     	       ::=	expresion:e1 IG expresion:e2		{: RESULT = Generador.condicion(e1, Tag.IG, e2); :}
 		            |	expresion:e1 NIG expresion:e2		{: RESULT = Generador.condicion(e1, Tag.NIG, e2); :}
 		            | 	expresion:e1 MEN expresion:e2		{: RESULT = Generador.condicion(e1, Tag.MEN, e2); :}
