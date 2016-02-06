@@ -1,4 +1,4 @@
 @echo off
 cd pruebas
-jflex PLC.flex
+jflex PLXC.flex
 pause
