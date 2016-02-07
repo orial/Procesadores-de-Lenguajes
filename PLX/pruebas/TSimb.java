@@ -8,7 +8,7 @@ public class TSimb {
 
     public static void addVar(String name, Integer actualScope) {
         if (exists(name)) {
-            if(variables.get(name).contains(actualScope)){ //comprueba que en el ambito actual la variable no este ya declarada
+            if(variables.get(name).contains(actualScope)){
                 Generador.error();
                 Generador.halt();
             }

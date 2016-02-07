@@ -1,0 +1,131 @@
+import java_cup.runtime.*;
+
+/* Terminales */
+
+terminal 				INT;
+terminal 				PYC, COMA, POR, AK, CK, ASIG, AP, CP;
+terminal         String IF, ELSE;
+terminal         String WHILE;
+terminal 				MAIN, RETURN;
+terminal 				MAS, MENOS, DIV, MENOSUNARIO;
+terminal            	MEN, MAY, MENIG, MAYIG;
+terminal            	IG, NIG;
+terminal        Integer NUMERO;
+terminal         Double NUMEROF;
+terminal         String IDENT;
+
+/* No Terminales */
+
+non terminal			lista_de_sent;
+non terminal			sentencia;
+non terminal 			listaDec;
+non terminal			dec;
+non terminal    Integer tipo;
+non terminal     String asig;
+non terminal     String expresion;
+non terminal 			funcion;
+non terminal 			invokeFunc;
+non terminal 			params;
+non terminal 	 		nombreF;
+non terminal    String	variable;
+non terminal        Tag cond;
+non terminal 	        elsePart;
+
+/* Precedencia */
+
+precedence left 		COMA;
+precedence right		ASIG;
+precedence left  		MAS, MENOS;
+precedence left  		POR, DIV;
+precedence left  		MENOSUNARIO;
+precedence left  		ELSE;
+
+/* Gramatica */
+
+lista_de_sent 		::= sentencia
+            		|	lista_de_sent sentencia
+			;
+sentencia			::=	expresion:e PYC			        	{: Generador.pop(); :}
+			// FUNCION
+					| 	funcion AK					        {: :}
+						lista_de_sent				        {: :}
+						CK							        {: Generador.endMethod();	TSimb.clear(); :}
+			// IF - ELSE (optional)
+					|	IF:tagIf AP cond:c CP				{: :}						
+						sentencia							{: Generador.goTo(tagIf); Generador.label(c.getF()); :}				
+						elsePart							{: Generador.label(tagIf); :}
+			// WHILE
+					|	WHILE:tagW 							{: Generador.label(tagW); :}
+						AP cond:c CP sentencia				{: Generador.goTo(tagW); Generador.label(c.getF()); :}
+        	// RETURN
+           			|   RETURN expresion:e1 PYC 	   	    {:
+                                                 		    	Generador.ireturn();
+                                                 		      	Generador.nop();
+                                                 		      	Generador.limitStack();
+                                                 		      	Generador.limitLocal();
+                                                 		   :}
+	    	// Anonymous block
+					|	AK lista_de_sent CK
+					|	listaDec PYC
+					;
+			// ELSE optional part
+elsePart			::=	ELSE sentencia
+					|
+					;
+			// Llamada de FUNCION
+invokeFunc			::=	IDENT:i AP expresion:e CP 			{: Generador.invoke(i); :}
+					;
+			// Declarations and multiple declarations
+listaDec    		::= tipo dec
+            		|   listaDec COMA dec
+            		;
+dec         		::= variable:i							{:
+													  			Generador.sipush("0");
+                                                       			TSimb.add(i, "0", 1);
+                                                       			Generador.istore(Integer.toString(TSimb.getVarTam()-1));
+															:}
+					|   variable:i ASIG expresion:e1		{:
+												       			TSimb.add(i, e1, 1);
+													   			Generador.istore(Integer.toString(TSimb.getVarTam()-1));
+															:}
+					;
+expresion			::=	expresion:e1 MAS expresion:e2	    {: RESULT = Generador.iadd(); :}
+					|	expresion:e1 MENOS expresion:e2	    {: Generador.isub(); :}
+					|	expresion:e1 POR expresion:e2	    {: RESULT = Generador.imul(); :}
+					|	expresion:e1 DIV expresion:e2	    {: Generador.idiv(); :}
+					|	MENOS expresion:e1				    {: Generador.sipush("-1"); Generador.imul(); :} %prec MENOSUNARIO
+					|	asig  			  					{: :}
+            		|   invokeFunc		 	    	      	{: :}
+					|	AP expresion:e1 CP 				    {: :}
+					|	variable:i 					    	{: Generador.iload(TSimb.indexOf(i)); :}
+					|	NUMERO:n	 			   			{: Generador.sipush(n.toString()); :}
+					;
+funcion				::=	tipo:t nombreF AP params CP			{: :}
+					;
+tipo				::= INT									{: RESULT = new Integer(1); :}
+					;
+variable 			::=	IDENT:i								{: RESULT = i; :}				
+					;
+nombreF				::= MAIN								{: Generador.funcion("main"); :}
+					|   IDENT:i								{: Generador.funcion(i); :}		
+					;
+params				::=	tipo:t IDENT:i						{: TSimb.add(i, "0", t); :}		
+					|	params COMA tipo:t IDENT:i			{: TSimb.add(i, "0", t);	:}
+					;
+asig				::=	 IDENT:i ASIG expresion:e1			{: Generador.dup(); Generador.istore(TSimb.indexOf(i)); :}
+					;
+cond				::= expresion:e1 MEN expresion:e2		{:
+													   			Generador.isub();
+													   			Tag tag = Generador.ifle();
+													   			Generador.goTo(tag.getF());
+													   			Generador.label(tag.getV());
+													   			RESULT = tag;
+															:}
+					|	expresion:e1 MAY expresion:e2		{:
+													   			Generador.isub();
+													   			Tag tag = Generador.ifge();
+													   			Generador.goTo(tag.getF());
+													   			Generador.label(tag.getV());
+													   			RESULT = tag;
+															:}
+					;

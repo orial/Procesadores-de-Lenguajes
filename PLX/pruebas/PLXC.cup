@@ -165,8 +165,7 @@ expresion   	   ::=	expresion:e1 MAS expresion:e2       {: RESULT = Generador.ar
                                                					Generador.asignacion(temp, TSimb.getVar(i));
                                                					Generador.asignacion(TSimb.getVar(i), TSimb.getVar(i) + " - " + "1");
                                                					RESULT = temp;
-							                				:}
-					| error                         		{: Generador.error(); Generador.halt(); :}		
+							                				:}		
                     ;
           
 cond     	       ::=	expresion:e1 IG expresion:e2		{: RESULT = Generador.condicion(e1, Tag.IG, e2); :}
