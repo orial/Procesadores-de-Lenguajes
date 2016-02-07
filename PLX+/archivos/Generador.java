@@ -1,99 +1,561 @@
+
 import java.io.PrintStream;
+import java.util.regex.Pattern;
+import java.util.List;
+import java.util.ArrayList;
 
 public class Generador {
+
+    public static final int MAS = 5;
+    public static final int MENOS = 6;
+    public static final int MULT = 7;
+    public static final int DIV = 8;
 
     private static int varTemp = 0;
     private static int tagCont = 0;
     protected static PrintStream out = System.out;
 
-	// Crea las variables temporales
-	public static String getTag(){
-		return "L" + tagCont++;
-	}
+    public static String getTemp(int tipo) {
+        String salida = "t" + varTemp++;
 
-    public static String getTemp(){
-		return "$t" + varTemp++;
-	}
+        Variable var = new Variable(TSimb.getLevel(), tipo);
+        TSimb.addVar(salida, var);
 
-	/**
-	 * OPERACIONES ARITMETICAS
-	 */
+        return salida;
+    }
 
-	public static String aritmetica(String op){
-		String tmp = getTemp();
-		out.println("   " + tmp + " = " + op + ";");
-		return tmp;
-	}
+    public static String getTag() {
+        return "L" + tagCont++;
+    }
 
-	/**
-	 * CONDICIONES
-	 */
+    public static void print(String exp) {
+        out.println("	print " + exp + ";");
+    }
 
-	public static Tag condicion(String arg1, int cond, String arg2){
-		String tagV = getTag();
-		String tagF = getTag();
+    public static String casting(String exp, int tipo) {
+        String tmp = "";
 
-		switch(cond){
-			case Tag.MAY:
-				out.println("	if (" + arg2 + " < " + arg1 + ") goto " + tagV + ";");
-				out.println("	goto " + tagF + ";");
-				break;
-			case Tag.MEN:
-				out.println("   if (" + arg1 + " < " + arg2 + ") goto " + tagV + ";");
+        // System.out.println("exp: " + exp + " tipo: " + tipo);
+        if (tipo == Variable.INTEGER) {
+            tmp = getTemp(Variable.INTEGER);
+            out.println("	" + tmp + " = (int) " + exp + ";");
+        } else if (tipo == Variable.REAL) {
+            tmp = getTemp(Variable.REAL);
+            out.println("	" + tmp + " = (float) " + exp + ";");
+        }
+        return tmp;
+    }
+
+    public static String asignacion(String ident, String exp) {
+        int tipo = 0;
+        int tipo2 = 0;
+        boolean flag = false;
+
+        //System.out.println("IDENT: " + ident + "\n" + " EXP: " + exp);
+        if (TSimb.getLastVar(ident).isArray() && TSimb.getLastVar(exp).isArray()) {
+            arrayAssignment(ident, exp);
+        }
+
+        tipo = checkExp(exp);
+        tipo2 = TSimb.getLastVar(ident).getTipo();
+
+        if (tipo == 3) {
+            dimension(exp, exp, 0);
+        }
+
+        if (tipo == 60 || tipo == 70) {
+            tipo = TSimb.getLastVar(exp).getTipo();
+            flag = true;
+        }
+
+        if ((tipo == 1 && tipo2 == 2) && flag) {
+            out.println("	" + ident + " = (float)" + exp + ";");
+        } else if ((tipo2 == 1 && tipo == 2) || (tipo2 == 2 && tipo == 1) && !flag) {
+            Generador.error();
+            Generador.halt();
+        } else {
+            out.println("	" + ident + " = " + exp + ";");
+        }
+
+        return ident;
+    }
+
+    public static String asignacionPlus(String ident, String exp) {
+        int tipo = 0;
+        int tipo2 = 0;
+        boolean flag = false;
+
+        if (TSimb.getLastVar(ident).isArray() && TSimb.getLastVar(exp).isArray()) {
+            arrayAssignment(ident, exp);
+        }
+
+        tipo = checkExp(exp);
+        tipo2 = TSimb.getLastVar(ident).getTipo();
+
+        if (tipo == 3) {
+            dimension(exp, exp, 0);
+        }
+
+        if (tipo == 60 || tipo == 70) {
+            tipo = TSimb.getLastVar(exp).getTipo();
+            flag = true;
+        }
+
+        if ((tipo == 1 && tipo2 == 2) && flag) {
+            out.println("   " + ident + " = (float)" + exp + ";");
+        } else if ((tipo2 == 1 && tipo == 2) || (tipo2 == 2 && tipo == 1) && !flag) {
+            Generador.error();
+            Generador.halt();
+        } else {
+            out.println("   " + ident + " = " + ident + " + " + exp + ";");
+        }
+
+        return ident;
+    }
+
+    public static String arrayAssignment(String ident, String exp) {
+        int tipo = TSimb.getLastVar(ident).getTipo();
+        int tipo2 = TSimb.getLastVar(exp).getTipo();
+
+        if (tipo != tipo2) {
+            error();
+            halt();
+        }
+
+        if (TSimb.getLastVar(ident).getTam() < TSimb.getLastVar(exp).getTam()) {
+            error();
+            halt();
+        }
+
+        String tmp = getTemp(tipo);
+        for (int i = 0; i < TSimb.getLastVar(ident).getTam(); i++) {
+            out.println("	" + tmp + " = " + exp + "[" + i + "]" + ";");
+            out.println("	" + ident + "[" + i + "]" + " = " + tmp + ";");
+        }
+        return tmp;
+    }
+
+    public static String asignacion(String ident, ArrayList<String> index, String exp) {
+        int tipo = 0;
+        int tipo2 = 0;
+        boolean flag = false;
+
+        for (int i = 0; i < index.size(); i++) {
+            dimension(ident, index.get(i), i);
+
+            tipo = checkExp(exp);
+            tipo2 = TSimb.getLastVar(ident).getTipo();
+
+            if (tipo == 60 || tipo == 70) {
+                tipo = TSimb.getLastVar(exp).getTipo();
+                flag = true;
+            }
+
+            if ((tipo == 1 && tipo2 == 2) && flag) {
+                String tmp = getTemp(TSimb.getLastVar(ident).getTipo());
+                out.println("	" + tmp + " = (float) " + exp + ";");
+                out.println("   " + ident + "[" + index.get(i) + "]" + " = " + tmp + ";");
+            } else if ((tipo2 == 1 && tipo == 2) || (tipo2 == 2 && tipo == 1) && !flag) {
+                String tmp = getTemp(tipo2);
+                out.println("	" + tmp + " = (float) " + exp + ";");
+                out.println("   " + ident + "[" + index.get(i) + "]" + " = " + tmp + ";");
+            } else {
+                String aux = ident + "[" + index.get(i) + "]";
+                out.println("   " + aux + " = " + exp + ";");
+            }
+
+        }
+
+        return ident;
+    }
+
+    public static String asignacionPlus(String ident, ArrayList<String> index, String exp) {
+        int tipo = 0;
+        int tipo2 = 0;
+        boolean flag = false;
+
+        for (int i = 0; i < index.size(); i++) {
+            dimension(ident, index.get(i), i);
+
+            tipo = checkExp(exp);
+            tipo2 = TSimb.getLastVar(ident).getTipo();
+
+            if (tipo == 60 || tipo == 70) {
+                tipo = TSimb.getLastVar(exp).getTipo();
+                flag = true;
+            }
+
+            if ((tipo == 1 && tipo2 == 2) && flag) {
+                String tmp = getTemp(TSimb.getLastVar(ident).getTipo());
+                out.println("   " + tmp + " = (float) " + exp + ";");
+                out.println("   " + ident + "[" + index + "]" + " = " + tmp + ";");
+            } else if ((tipo2 == 1 && tipo == 2) || (tipo2 == 2 && tipo == 1) && !flag) {
+                String tmp = getTemp(tipo2);
+                out.println("   " + tmp + " = (float) " + exp + ";");
+                out.println("   " + ident + "[" + index + "]" + " = " + tmp + ";");
+            } else {
+                String aux = ident + "[" + index + "]";
+                String temp = getTemp(tipo2);
+                out.println("	" + temp + " = " + aux + ";");
+                out.println("	" + temp + " = " + temp + " + " + exp + ";");
+                out.println("   " + aux + " = " + temp + ";");
+            }
+        }
+
+        return ident;
+    }
+
+    public static String arrayInit(String ident, List<String> exps) {
+        int tipo = 0;
+        int index = 0;
+
+        if (TSimb.getLastVar(ident).getTam() < exps.size()) {
+            error();
+            halt();
+            return "";
+        }
+
+        // System.out.println("IDENT: " + ident + "\n" + "EXP: " + exps.get(1));
+        int tipo2 = checkExp(exps.get(1));
+
+        if (tipo2 == 60 || tipo2 == 70) {
+            tipo2 = TSimb.getLastVar(exps.get(1)).getTipo();
+        }
+
+        if (TSimb.getLastVar(ident).getTipo() != tipo2) {
+            error();
+            halt();
+            return "";
+        }
+
+        tipo = checkExp(ident);
+
+        if (tipo == 60 || tipo == 70) {
+            tipo = TSimb.getLastVar(ident).getTipo();
+        }
+
+        String tmp = getTemp(tipo);
+        String tmp2 = getTemp(tipo);
+        TSimb.getLastVar(tmp).setIsArray(true);
+
+        for (String iter : exps) {
+            out.println("   " + tmp + "[" + index + "]" + " = " + iter + ";");
+            index++;
+        }
+
+        for (int i = 0; i < index; i++) {
+            out.println("	" + tmp2 + " = " + tmp + "[" + i + "]" + ";");
+            out.println("	" + ident + "[" + i + "]" + " = " + tmp2 + ";");
+        }
+
+        out.println("	" + ident + " = " + tmp + ";");
+
+        return ident;
+    }
+
+    public static String aritmetica(String arg1, String arg2, int op) {
+        int tipo = 0;
+        int tipo2 = 0;
+
+        tipo = checkExp(arg1);
+        tipo2 = checkExp(arg2);
+
+        // System.out.println("tipo: " + tipo + " " + arg1 + "\ntipo2: " + tipo2 + " " + arg2);
+        if (tipo == 60 || tipo == 70) {
+            tipo = TSimb.getLastVar(arg1).getTipo();
+        }
+
+        if (tipo2 == 60 || tipo2 == 70) {
+            tipo2 = TSimb.getLastVar(arg2).getTipo();
+        }
+
+        // System.out.println("tipo: " + tipo + " " + arg1 + "\ntipo2: " + tipo2 + " " + arg2);
+        if ((tipo == 1 && tipo2 == 2) || (tipo == 2 && tipo2 == 1)) {
+            if (tipo == 1) {
+                String tmp2 = getTemp(tipo2);
+                Generador.asignacion(tmp2, arg1);
+                arg1 = tmp2;
+            } else {
+                String tmp2 = getTemp(tipo);
+                Generador.asignacion(tmp2, arg2);
+                arg2 = tmp2;
+            }
+        }
+
+        String tmp = getTemp(tipo);
+
+        if (tipo == 2 || tipo2 == 2) {
+
+            switch (op) {
+                case MAS:
+                    out.println("   " + tmp + " = " + arg1 + " +r " + arg2 + ";");
+                    break;
+                case MENOS:
+                    out.println("	" + tmp + " = " + arg1 + " -r " + arg2 + ";");
+                    break;
+                case MULT:
+                    out.println("	" + tmp + " = " + arg1 + " *r " + arg2 + ";");
+                    break;
+                case DIV:
+                    String value = "";
+                    if (isIdent(arg2) || isTemp(arg2)) {
+
+                    }
+                    if (isZero(arg2)) {
+                        error();
+                        halt();
+                    } else {
+                        out.println("	" + tmp + " = " + arg1 + " /r " + arg2 + ";");
+                    }
+                    break;
+                default:
+                    out.println("	" + tmp + " = " + arg1 + ";");
+            }
+        } else {
+            switch (op) {
+                case MAS:
+                    out.println("   " + tmp + " = " + arg1 + " + " + arg2 + ";");
+                    break;
+                case MENOS:
+                    out.println("   " + tmp + " = " + arg1 + " - " + arg2 + ";");
+                    break;
+                case MULT:
+                    out.println("   " + tmp + " = " + arg1 + " * " + arg2 + ";");
+                    break;
+                case DIV:
+                    if (isZero(arg2)) {
+                        error();
+                        halt();
+                    } else {
+                        out.println("   " + tmp + " = " + arg1 + " / " + arg2 + ";");
+                    }
+                    break;
+                default:
+                    out.println("	" + tmp + " = " + arg1 + ";");
+            }
+        }
+        return tmp;
+    }
+
+    public static Tag forIn(String e1, String tagFor, Object e2) {
+        String tmp = getTemp(1);
+        int size = 0;
+        int tipo = 0, tipo2 = 0;
+        String array = "";
+        String ident = (e1.indexOf('[') == -1) ? e1 : e1.substring(0, e1.indexOf('['));
+
+        //System.out.println("IDENT: " + e1 + " " + e2.toString());
+        if (e2 instanceof String) {
+
+            if (!TSimb.exists(e2.toString())) {
+                error();
+                halt();
+                return new Tag(getTag(), getTag());
+            }
+
+            if (!TSimb.getLastVar(e2.toString()).isArray()) {
+                error();
+                halt();
+                return new Tag(getTag(), getTag());
+            }
+
+            array = e2.toString();
+            size = TSimb.getLastVar(array).getTam();
+            tipo = TSimb.getLastVar(ident).getTipo();
+            tipo2 = TSimb.getLastVar(array).getTipo();
+        } else {
+            array = getTemp(TSimb.getLastVar(ident).getTipo());
+            size = ((List<String>) e2).size();
+
+            int i = 0;
+            for (String iter : (List<String>) e2) {
+                out.println("	" + array + "[" + i + "]" + " = " + iter + ";");
+                i++;
+            }
+        }
+
+        if (tipo != tipo2) {
+            error();
+            halt();
+        }
+
+        Generador.asignacion(tmp, "-1");
+        label(tagFor);
+        Generador.asignacion(tmp, tmp + " + " + "1");
+        Tag m = condicion(tmp, Tag.MEN, Integer.toString(size));
+        label(m.getV());
+
+        if (e1.indexOf('[') == -1) {
+            Generador.asignacion(e1, array + "[" + tmp + "]");
+        } else {
+            String tmp2 = getTemp(TSimb.getLastVar(ident).getTipo());
+            Generador.asignacion(tmp2, array + "[" + tmp + "]");
+            out.println("	" + e1 + " = " + tmp2 + ";");
+        }
+        return m;
+    }
+
+    public static void printLine(String n) {
+        out.println(n);
+    }
+
+    public static void dimension(String ident, String index, int ind) {
+        if (isArray(ident) && isArray(index)) {
+            boolean flag = true;
+            String aux = "";
+            for (int i = 0; i < ident.length() && flag; i++) {
+                if (ident.charAt(i) == '[') {
+                    flag = false;
+                } else {
+                    aux += ident.charAt(i);
+                }
+            }
+            ident = aux;
+
+            aux = "";
+            flag = true;
+
+            for (int j = 0; j < index.length() && flag; j++) {
+                if (index.charAt(j) == '[') {
+                    aux += index.charAt(j + 1) + "";
+                    flag = false;
+                }
+            }
+
+            index = aux;
+        }
+
+        if (isTemp(ident)) {
+            return;
+        }
+
+        if (!TSimb.getLastVar(ident).isArray()) {
+            return;
+        }
+
+        Tag tag = new Tag(getTag(), getTag());
+        int size;
+        if (ind == 0) {
+            size = TSimb.getLastVar(ident).getTam();
+        } else {
+            size = TSimb.getLastVar(ident).getTam2();
+        }
+
+        out.println("# Comprobacion de rango");
+        out.println("   if (" + index + " < 0) goto " + tag.getV() + ";");
+        out.println("   if (" + size + " < " + index + ") goto " + tag.getV() + ";");
+        out.println("   if (" + size + " == " + index + ") goto " + tag.getV() + ";");
+        goTo(tag.getF());
+        label(tag.getV());
+        error();
+        halt();
+        label(tag.getF());
+    }
+
+    public static void label(String tag) {
+        out.println(tag + ":");
+    }
+
+    public static void goTo(String tag) {
+        out.println("	goto " + tag + ";");
+    }
+
+    public static void error() {
+        out.println("	error;");
+    }
+
+    public static void halt() {
+        out.println("	halt;");
+    }
+
+    public static Tag condicion(String arg1, int cond, String arg2) {
+        String tagV = getTag();
+        String tagF = getTag();
+
+        switch (cond) {
+            case Tag.MAY:
+                out.println("	if (" + arg2 + " < " + arg1 + ") goto " + tagV + ";");
+                out.println("	goto " + tagF + ";");
+                break;
+            case Tag.MEN:
+                out.println("   if (" + arg1 + " < " + arg2 + ") goto " + tagV + ";");
                 out.println("   goto " + tagF + ";");
                 break;
-			case Tag.IG:
-				out.println("   if (" + arg1 + " == " + arg2 + ") goto " + tagV + ";");
+            case Tag.IG:
+                out.println("   if (" + arg1 + " == " + arg2 + ") goto " + tagV + ";");
                 out.println("   goto " + tagF + ";");
                 break;
-			case Tag.MENIG:
-				out.println("   if (" + arg2 + " < " + arg1 + ") goto " + tagF + ";");
+            case Tag.MENIG:
+                out.println("   if (" + arg2 + " < " + arg1 + ") goto " + tagF + ";");
                 out.println("   goto " + tagV + ";");
                 break;
-			case Tag.MAYIG:
-				out.println("   if (" + arg1 + " < " + arg2 + ") goto " + tagF + ";");
+            case Tag.MAYIG:
+                out.println("   if (" + arg1 + " < " + arg2 + ") goto " + tagF + ";");
                 out.println("   goto " + tagV + ";");
                 break;
-			case Tag.NIG:
-				out.println("   if (" + arg1 + " == " + arg2 + ") goto " + tagF + ";");
+            case Tag.NIG:
+                out.println("   if (" + arg1 + " == " + arg2 + ") goto " + tagF + ";");
                 out.println("   goto " + tagV + ";");
                 break;
-		}
-		return new Tag(tagV, tagF);
-	}
+        }
 
-	/**
-	 * INSTRUCCIONES DISPONIBLES
-	 */
+        return new Tag(tagV, tagF);
+    }
 
-	// left = right;
-	public static String asignacion(String ident, String exp){
-		out.println("   " + ident + " = " + exp + ";");
-		return ident;
-	}
+    public static boolean isReal(String in) {
 
-	// goto label;
-	public static void goTo(String tag){
-		out.println("   goto " + tag + ";");
-	}
+        Pattern p = Pattern.compile("[-]?[0-9]*\\.[0-9]+[eE]*[+-]?[0-9]*");
 
-	// label:
-	public static void label(String tag){
-		out.println(tag + ":");
-	}
+        return Pattern.matches(p.pattern(), in);
+    }
 
-	// print e;
-	public static void print(String exp){
-		out.println("   print " + exp + ";");
-	}
+    public static boolean isInteger(String in) {
 
-	// halt;
-	public static void halt(){
-		out.println("   halt;");
-	}
-        
-        // error
-        public static void error(){
-		out.println("	error;");
-	}
+        Pattern p = Pattern.compile("0|[1-9][0-9]*");
+
+        return Pattern.matches(p.pattern(), in);
+    }
+
+    public static boolean isIdent(String in) {
+
+        Pattern p = Pattern.compile("[_a-zA-Z][_a-zA-Z0-9]*");
+
+        return Pattern.matches(p.pattern(), in);
+    }
+
+    public static boolean isTemp(String in) {
+        Pattern p = Pattern.compile("[$][a-zA-Z][_a-zA-Z0-9]*");
+
+        return Pattern.matches(p.pattern(), in);
+    }
+
+    public static boolean isArray(String in) {
+
+        Pattern p = Pattern.compile("[_a-zA-Z]+(?:\\[[_a-zA-Z0-9]*\\])+");
+
+        return Pattern.matches(p.pattern(), in);
+    }
+
+    public static boolean isZero(String in) {
+
+        Pattern p = Pattern.compile("[0]*\\.?[0]*");
+
+        return Pattern.matches(p.pattern(), in);
+    }
+
+    public static int checkExp(String in) {
+        if (isReal(in)) {
+            return 2;
+        } else if (isInteger(in)) {
+            return 1;
+        } else if (isArray(in)) {
+            return 3;
+        } else if (isIdent(in)) {
+            return 60;
+        } else if (isTemp(in)) {
+            return 70;
+        } else {
+            return 0;
+        }
+    }
 }

@@ -1,4 +1,3 @@
-
 import java.io.PrintStream;
 import java.util.regex.Pattern;
 
@@ -8,15 +7,15 @@ public class Generador {
 
     private static int tagCont = 0;
 
-    public static String getTag() {
+    public static String getTag(){
         return "L" + tagCont++;
     }
 
     public static void funcion(String f) {
-        out.println(".method public static " + f + " (I)I");
+        out.println(".method public static " + f + "(I)I");
     }
 
-    public static void sipush(String valor) {
+    public static void sipush(String valor){
         TSimb.push(valor);
         out.println("	sipush " + valor);
     }
@@ -69,12 +68,12 @@ public class Generador {
     }
 
     public static void idiv() {
-        String x = TSimb.pop();
-        String y = TSimb.pop();
+        //String x = TSimb.pop();
+        //String y = TSimb.pop();
 
-        int res = new Integer(x) / new Integer(y);
+        //int res = new Integer(x) / new Integer(y);
 
-        TSimb.push(Integer.toString(res));
+        //TSimb.push(Integer.toString(res));
         out.println("	idiv");
     }
 

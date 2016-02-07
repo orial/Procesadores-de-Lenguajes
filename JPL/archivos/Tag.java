@@ -1,5 +1,4 @@
-
-public class Tag {
+public class Tag{
 
     public static final int MAY = 1;
     public static final int MEN = 2;
