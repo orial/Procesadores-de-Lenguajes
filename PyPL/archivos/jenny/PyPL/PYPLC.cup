@@ -1,0 +1,105 @@
+//PYPLC
+import java_cup.runtime.*;
+
+/* Terminales */
+terminal		MAS, MENOS, POR, DIV, MASMAS, EXP, MOD, DIVINT;
+terminal		AP, CP;
+terminal		AC, CC, AL, CL;
+terminal		WHILE, DO;
+terminal		PRINT, IF, ELSE, ELIF;
+terminal		IGUAL, MAYOR, MENOR, MAYORIGUAL, MENORIGUAL, DIF, ASIG;
+terminal		NOT, AND, OR;
+terminal		PYC, COMA, DP;
+terminal		CASTINGFLOATAENTERO, CASTINGFLOATAEXPRESION;
+terminal String		IDENT, INT, FLOAT,RANGE;
+terminal String		ENTERO, REAL;
+terminal BloqueCond	IN;
+terminal EtiquetaFor	FOR;
+
+/* No terminales */
+non terminal 		sent,opcional;
+non terminal		prog;
+non terminal BloqueCond	cond;
+non terminal 	String	exp;
+
+/* Precedencia */
+precedence left ASIG;
+precedence left OR;
+precedence left AND;
+precedence left IGUAL, DIF;
+precedence left MENOR, MENORIGUAL, MAYOR, MAYORIGUAL;
+precedence left MAS, MENOS;
+precedence left POR, DIV, MOD,DIVINT;
+precedence left ELSE,ELIF;
+precedence right NOT;
+precedence left EXP;
+
+/* Gramatica */
+prog	::= 	prog sent 
+		|
+		;
+sent	::=	exp
+		| IF cond:c DP		{: RESULT = Util.generarEtiq(); PYPLC.out.println(c.etqV + ":");:}
+		  sent:s 		{: PYPLC.out.println("   goto " + RESULT + ";\n" + c.etqF + ":" ); :}
+		  opcional 		{: PYPLC.out.println(RESULT + ":"); :}
+		| PRINT exp:e1 	{: PYPLC.out.println("   print " + e1 + ";"); :}
+		| AL prog CL
+		| FOR:etq AP exp	{: etq.setEtiqueta(Util.generarEtiq()); PYPLC.out.println(etq.getEtiqueta() + ":"); :}
+		  PYC cond:c PYC	{: RESULT = Util.generarEtiq(); PYPLC.out.println(RESULT+":"); :}
+		  exp CP 		{: PYPLC.out.println("   goto " + etq.getEtiqueta() + ";\n" + c.etqV + ":"); :} 
+		  sent 			{: PYPLC.out.println("   goto " + RESULT + ";\n" + c.etqF + ":"); :}
+		| FOR:inic exp:e1 IN:c RANGE AP exp:e2 COMA exp:e3 CP DP	{: 	PYPLC.out.println("   " + e1 + " = " + e2 + ";");
+											inic.setEtiqueta(Util.generarEtiq());
+											c.etqV = Util.generarEtiq();
+											c.etqF = Util.generarEtiq();
+											RESULT = Util.generarEtiq();
+											PYPLC.out.println(inic.getEtiqueta() + ":");
+											PYPLC.out.println("   if (" + e1 + " < " + e3 + " ) goto " + c.etqV + ";");
+											PYPLC.out.println("   goto " + c.etqF + ";\n" + RESULT + ":");
+											String tmp = Util.nuevoTemporal();
+											PYPLC.out.println("   " + tmp + " = " + e1 + " + 1;\n   " + e1 + " = " + tmp + ";");
+											PYPLC.out.println("   goto " + inic.getEtiqueta() + ";\n" + c.etqV + ":");
+										:}
+		  sent								{:	PYPLC.out.println("   goto " + RESULT + ";\n" + c.etqF + ":");:}
+		| WHILE  		{: RESULT = Util.generarEtiq(); PYPLC.out.println(RESULT+":");:}
+		  cond:c DP		{: PYPLC.out.println(c.etqV + ":"); :} 
+		  sent:s		{: PYPLC.out.println("   goto " + RESULT + ";\n" + c.etqF + ":"); :}
+		;
+exp	::=	IDENT:id		{: RESULT = id; :}
+		| ENTERO:n		{: RESULT = n; :}
+		| exp:e1 MAS exp:e2	{: RESULT = Util.nuevoTemporal(); PYPLC.out.println("   " + RESULT + " = " + e1 + " + " + e2 + ";"); :}
+		| exp:e1 MENOS exp:e2	{: RESULT = Util.nuevoTemporal(); PYPLC.out.println("   " + RESULT + " = " + e1 + " - " + e2 + ";"); :}
+		| exp:e1 POR exp:e2	{: RESULT = Util.nuevoTemporal(); PYPLC.out.println("   " + RESULT + " = " + e1 + " * " + e2 + ";"); :}
+		| exp:e1 DIV exp:e2	{: RESULT = Util.nuevoTemporal(); PYPLC.out.println("   " + RESULT + " = " + e1 + " / " + e2 + ";"); :}
+		| exp:e1 DIVINT exp:e2	{: RESULT = Util.nuevoTemporal(); PYPLC.out.println("   " + RESULT + " = " + e1 + " / " + e2 + ";"); :}
+		| exp:e1 ASIG exp:e2	{: RESULT = Util.nuevoTemporal(); PYPLC.out.println("   " + RESULT + " = " + e1 + " / " + e2 + ";"); :}
+		| exp:e1 EXP exp:e2	{: RESULT = Util.elevar(e1,e2); :}
+		| exp:e1 MOD exp:e2	{: RESULT = Util.modulo(e1,e2); :}
+		| MENOS exp:e1		{: RESULT = Util.nuevoTemporal(); PYPLC.out.println("   " + RESULT + " = -" + e1 + ";"); :} 
+		| AP exp:e1 CP		{: RESULT = e1; :}
+		| IDENT:id ASIG exp:e	{: RESULT = id; PYPLC.out.println("   " + id + " = " + e + ";"); :}
+		;
+opcional ::=	ELSE DP sent:s		%prec ELSE
+		| ELIF cond:c DP 	{: RESULT = Util.generarEtiq(); PYPLC.out.println(c.etqV + ":");:}
+		  sent:s		{: PYPLC.out.println("   goto " + RESULT + ";\n" + c.etqF + ":" ); :}
+		  opcional 		{: PYPLC.out.println(RESULT + ":"); :} %prec ELIF
+		|			%prec IF
+		;
+cond	::=	exp:e1 MAYOR exp:e2	{: RESULT = Util.generarCondicion(e1, ">", e2); :}
+		| exp:e1 MENOR exp:e2	{: RESULT = Util.generarCondicion(e1, "<", e2); :}
+		| exp:e1 MAYORIGUAL exp:e2	{: RESULT = Util.generarCondicion2(e1, ">=", e2); :}
+		| exp:e1 MENORIGUAL exp:e2	{: RESULT = Util.generarCondicion2(e1, "<=", e2); :}
+		| exp:e1 IGUAL exp:e2	{: RESULT = Util.generarCondicion(e1, "==", e2); :}
+		| exp:e1 DIF exp:e2	{: RESULT = Util.generarCondicion2(e1, "!=", e2); :}
+		| NOT cond:c		{: RESULT = new BloqueCond(); RESULT.etqV = c.etqF; RESULT.etqF = c.etqV; :}
+		| cond:c1 AND 		{: PYPLC.out.println(c1.etqV + ":"); :} 
+		  cond:c2		{: PYPLC.out.println(c1.etqF + ":\n   goto " + c2.etqF + ";"); RESULT = c2;:}	
+		| cond:c1 OR 		{: PYPLC.out.println(c1.etqF + ":"); :} 
+		  cond:c2		{: PYPLC.out.println(c1.etqV + ":\n   goto " + c2.etqV + ";"); RESULT = c2;:}
+		| AP cond:c1 CP		{: RESULT = c1; :}
+		;
+			
+/*
+
+if ( 2 == 2 && 3 == 3 && 2!=3 ) print (2*3);
+*/

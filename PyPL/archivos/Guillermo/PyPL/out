@@ -1,0 +1,19 @@
+	if (2 < 2) goto L1;
+	goto L2;
+L1:
+	print 1;
+	if (2 < 2) goto L4;
+	goto L5;
+L4:
+	print 3;
+	print 3;
+	print 3;
+	goto L3;
+L5:
+L3:
+	print 5;
+	goto L0;
+L2:
+L0:
+	print 6;
+	halt;

@@ -1,0 +1,359 @@
+package parser;
+
+import python_program.*;
+import python_program.expression.*;
+import python_program.operators.*;
+import python_program.statement.*;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Collections;
+
+
+import java_cup.runtime.*;
+
+action code
+{:
+	public static List<String> function = new LinkedList<String>();
+	public static List<String> variables = new LinkedList<String>();
+:}
+
+
+terminal		PRINT,
+				PLUS,
+				MINUS,
+				UMINUS,
+				MULT,
+				DIV,
+				POW,
+				MOD,
+				LEFTPARENTHESE,
+				RIGHTPARENTHESE,
+				INPUT,
+				INTEGER,
+				COMMA,
+				NOT,
+				LESS,
+				GREATER,
+				EQUAL,
+				GREATEROREQUAL,
+				LESSOREQUAL,
+				NOTEQUAL,
+				OR,
+				AND,
+				TRUE,
+				FALSE,
+				IF,
+				ELSE,
+				FLOAT,
+				COLON,
+				IDENTIFIER,
+				NEWLINE,
+				PASS,
+				ASSIGN,
+				WHILE,
+				SEMICOLON,
+				INDENT,
+				DEDENT,
+				LEFTSQUAREBRACKET,
+				RIGHTSQUAREBRACKET,
+				LEFTCURLYBRACKET,
+				RIGHTCURLYBRACKET,
+				IS,
+				LAMBDA,
+				DEF,
+				RETURN,
+				FULLSTOP,
+				CLASS;
+
+
+non terminal	program,
+				module,
+				simple_statement,
+				simple_statement_list,
+				expression,
+				expression_comma_list,
+				compound_statement,
+				stmt_list,
+				statement,
+				suite,
+				statement_list,
+				statement_newline_list,
+				key_datum,
+				key_datum_comma_list,
+				subscription,
+				target,
+				identifier_comma_list,
+				expression_list;
+				
+				
+/* Precedences */
+precedence left LAMBDA;
+precedence left IF, ELSE;
+precedence left ASSIGN;
+precedence left OR;
+precedence left AND;
+precedence left NOT;
+precedence left LESS, GREATER, LESSOREQUAL, GREATEROREQUAL, EQUAL, NOTEQUAL, IS;
+precedence left PLUS, MINUS;
+precedence left MULT, DIV, MOD;
+precedence left UMINUS;
+precedence left POW;
+precedence left LEFTSQUAREBRACKET, RIGHTSQUAREBRACKET, LEFTCURLYBRACKET, RIGHTCURLYBRACKET, LEFTPARENTHESE, RIGHTPARENTHESE;
+
+program						::=	module:list
+								{: 	Collections.reverse((List<Statement>)list);
+									RESULT = new Program((List<Statement>)list);
+								:};
+
+module						::= simple_statement:stmt simple_statement_list:list
+									{: ((List<Statement>)list).add((Statement)stmt);
+										RESULT = list;
+									:}
+								|
+								statement_newline_list:list							//#3
+								{: RESULT = list; :};
+
+statement_newline_list		::=	NEWLINE statement_newline_list:list
+								{: RESULT = list; :} 
+								|
+								statement:stmt statement_newline_list:list			//#5
+								{:	
+									((List<Statement>)list).addAll((List<Statement>)stmt);
+									RESULT = list;
+								:}
+								|
+								/*epsilon*/											//#6
+								{: RESULT = new LinkedList<Statement>(); :}; 
+
+simple_statement_list		::= simple_statement:stmt simple_statement_list:list
+									{:
+										((List<Statement>)list).add((Statement)stmt);
+										RESULT = list;
+									:}
+								| 
+								/* epsilon */
+									{: RESULT = new LinkedList<Statement>(); :};
+							
+simple_statement			::= PRINT expression_comma_list:list			
+									{: 
+										RESULT = new PrintStatement((List<Expression>)list); 
+									:}
+								|
+								PASS
+									{:
+										RESULT = new PassStatement();
+									:}
+								|
+								IDENTIFIER:value ASSIGN expression:expr
+									{:
+										RESULT = new AssignStatement(new IdentifierExpression((String)value), (Expression)expr);
+									:}
+								|
+								expression:expr
+									{: RESULT = new ExpressionStatement((Expression)expr);	:}
+								|
+								target:target ASSIGN expression:expr
+									{: RESULT = new TargetAssignStatement((Expression)target, (Expression)expr);	:}
+								|
+								RETURN expression:expr
+									{: RESULT = new ReturnStatement((Expression)expr);	:};
+
+expression_comma_list		::= expression_comma_list:list COMMA expression:expr
+									{: 
+										((List<Expression>)list).add((Expression)expr); 
+										RESULT = list;
+									:}
+								|
+								expression:expr							
+									{: 
+										List<Expression> list = new LinkedList<Expression>();
+										if((Expression)expr != null) {
+											list.add((Expression)expr);
+										}
+										RESULT = list;
+									:}
+								|
+								/**/
+									{: RESULT = new LinkedList<Expression>();	:};					
+								
+expression					::= INTEGER:value												
+									{: RESULT = new IntegerExpression((String)value); :}
+								|
+								MINUS expression:expr									
+									{: RESULT = new UnaryExpression(UnaryOperators.sub, (Expression) expr); :} %prec UMINUS
+								|
+								PLUS expression:expr									
+									{: RESULT = new UnaryExpression(UnaryOperators.add, (Expression) expr); :} %prec UMINUS
+								|
+								NOT expression:expr									
+									{: RESULT = new UnaryExpression(UnaryOperators.not, (Expression) expr); :} %prec NOT
+								|
+								expression:expr1 PLUS expression:expr2				
+									{: RESULT = new BinaryExpression((Expression) expr1, BinaryOperators.add, (Expression) expr2); :}
+								|
+								expression:expr1 MINUS expression:expr2				
+									{: RESULT = new BinaryExpression((Expression) expr1, BinaryOperators.sub, (Expression) expr2); :}
+								|
+								expression:expr1 MULT expression:expr2				
+									{: RESULT = new BinaryExpression((Expression) expr1, BinaryOperators.mult, (Expression) expr2); :}
+								|
+								expression:expr1 DIV expression:expr2				
+									{: RESULT = new BinaryExpression((Expression) expr1, BinaryOperators.div, (Expression) expr2); :}
+								|
+								expression:expr1 MOD expression:expr2				
+									{: RESULT = new BinaryExpression((Expression) expr1, BinaryOperators.mod, (Expression) expr2); :}
+								|
+								expression:expr1 POW expression:expr2				
+									{: RESULT = new BinaryExpression((Expression) expr1, BinaryOperators.pow, (Expression) expr2); :}
+								|
+								expression:expr1 LESS expression:expr2				
+									{: RESULT = new BinaryExpression((Expression) expr1, BinaryOperators.less, (Expression) expr2); :}
+								|
+								expression:expr1 GREATER expression:expr2				
+									{: RESULT = new BinaryExpression((Expression) expr1, BinaryOperators.greater, (Expression) expr2); :}
+								|
+								expression:expr1 EQUAL expression:expr2				
+									{: RESULT = new BinaryExpression((Expression) expr1, BinaryOperators.equal, (Expression) expr2); :}
+								|
+								expression:expr1 GREATEROREQUAL expression:expr2				
+									{: RESULT = new BinaryExpression((Expression) expr1, BinaryOperators.greaterorequal, (Expression) expr2); :}
+								|
+								expression:expr1 LESSOREQUAL expression:expr2				
+									{: RESULT = new BinaryExpression((Expression) expr1, BinaryOperators.lessorequal, (Expression) expr2); :}
+								|
+								expression:expr1 NOTEQUAL expression:expr2				
+									{: RESULT = new BinaryExpression((Expression) expr1, BinaryOperators.notequal, (Expression) expr2); :}
+								|
+								expression:expr1 OR expression:expr2				
+									{: RESULT = new BinaryExpression((Expression) expr1, BinaryOperators.or, (Expression) expr2); :}
+								|
+								expression:expr1 AND expression:expr2				
+									{: RESULT = new BinaryExpression((Expression) expr1, BinaryOperators.and, (Expression) expr2); :}
+								|
+								LEFTPARENTHESE expression:expr RIGHTPARENTHESE
+									{: RESULT = new ParenthesesExpression((Expression)expr); :}
+								|
+								INPUT LEFTPARENTHESE RIGHTPARENTHESE
+									{: RESULT = new InputExpression(); :}
+								|
+								FLOAT:value
+									{: RESULT = new FloatExpression(((String)value)); :}
+								|
+								TRUE
+									{: RESULT = new TrueExpression(); :}
+								|
+								FALSE
+									{: RESULT = new FalseExpression(); :}
+								|
+								IDENTIFIER:value
+									{: RESULT = new IdentifierExpression((String)value);	:}
+								|
+								LEFTSQUAREBRACKET expression_comma_list:list RIGHTSQUAREBRACKET
+									{: RESULT = new ListExpression((List<Expression>)list);	:}
+								|
+								subscription:value
+									{: RESULT = value; :}
+								|
+								expression:expr LEFTPARENTHESE RIGHTPARENTHESE
+									{: RESULT = new FunctionExpression((Expression)expr, new LinkedList<Expression>());	:}
+								|
+								expression:expr LEFTPARENTHESE expression_comma_list:list RIGHTPARENTHESE
+									{: RESULT = new FunctionExpression((Expression)expr, (LinkedList<Expression>)list);	:}
+									
+								|
+								LAMBDA COLON expression:expr
+									{: RESULT = new LambdaExpression(new LinkedList<String>(), (Expression)expr);	:}
+								|
+								LAMBDA IDENTIFIER:identifier identifier_comma_list:list COLON expression:expr
+									{:
+										((List<String>)list).add((String)identifier);
+										RESULT = new LambdaExpression((List<String>)list, (Expression)expr);
+									:};
+								
+compound_statement			::= IF expression:expr COLON suite:list1 ELSE COLON suite:list2
+									{:
+										RESULT = new IfElseStatement((Expression)expr, (List<Statement>)list1, (List<Statement>)list2);
+									:}
+								|
+								IF expression:expr COLON suite:list
+									{:
+										RESULT = new IfStatement((Expression)expr, (List<Statement>)list);
+									:}
+								|
+								WHILE expression:expr COLON suite:list
+									{:
+										RESULT = new WhileStatement((Expression)expr, (List<Statement>)list);
+									:}
+								|
+								DEF IDENTIFIER:identifier LEFTPARENTHESE RIGHTPARENTHESE COLON suite:list
+									{: 
+										interpreter.FunctionsVariables.function.add((String) identifier);
+										RESULT = new FunctionDefinitionStatement((String)identifier, new LinkedList<String>(), (List<Statement>)list); 	
+									:}
+								|
+								DEF IDENTIFIER:identifier1 LEFTPARENTHESE IDENTIFIER:identifier2 identifier_comma_list:identifierList RIGHTPARENTHESE COLON suite:list
+									{: 
+										interpreter.FunctionsVariables.function.add((String) identifier1);
+										((List<String>)identifierList).add((String)identifier2);
+										RESULT = new FunctionDefinitionStatement((String)identifier1, (List<String>)identifierList, (List<Statement>)list); 	
+									:};
+								
+stmt_list					::= simple_statement:stmt SEMICOLON stmt_list:list
+									{:
+										((List<Statement>)list).add((Statement)stmt);
+										RESULT = list;
+									:}
+								|
+								simple_statement:stmt
+									{:
+										List<Statement> list = new LinkedList<Statement>();
+										list.add((Statement)stmt);
+										RESULT = list;
+									:};
+					
+statement					::= stmt_list:list NEWLINE								
+									{: RESULT = list; :}
+								|
+								compound_statement:stmt
+									{: 
+										List<Statement> list = new LinkedList<Statement>();
+										list.add((Statement)stmt);
+										RESULT = list;
+									:};
+																
+suite						::= stmt_list:list NEWLINE
+									{: RESULT = (List<Statement>)list;:}
+								|
+								NEWLINE INDENT statement_list:list DEDENT
+									{: RESULT = (List<Statement>)list;	:};
+								
+statement_list				::= statement_list:list statement:stmt 
+									{:
+										((List<Statement>)list).addAll((List<Statement>)stmt);
+										RESULT = list;
+									:}
+								|
+								statement : stmt
+									{:
+										List<Statement> list = new LinkedList<Statement>();
+										list.addAll((List<Statement>)stmt);
+										RESULT = list;
+									:};
+
+subscription				::= expression:expr1 LEFTSQUAREBRACKET expression:expr2 RIGHTSQUAREBRACKET
+									{: RESULT = new SubscriptionExpression((Expression)expr1, (Expression)expr2); :};
+
+target						::= subscription:subscription
+									{: RESULT = subscription;	:};
+								
+identifier_comma_list		::= COMMA IDENTIFIER:identifier identifier_comma_list:list
+									{: 
+										((List<String>)list).add((String)identifier);
+										RESULT = list;
+									:}
+								|
+								/*epsilon*/
+									{: RESULT = new LinkedList<String>();	:};
+								
+expression_list				::= expression_comma_list:list
+									{: RESULT = list;	:};

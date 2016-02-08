@@ -1,0 +1,183 @@
+import java_cup.runtime.*;
+
+action code {:
+
+	public int temp = 0;
+	
+	public String nuevaTmp(){ 
+		String var = "t"+temp;
+		temp++;
+		return var; 
+	}
+	
+	public void print(String s){
+	    PyPL.out.println(s);
+	}
+	
+	public void error(){
+	    print("\terror;\n\thalt;");
+	}
+	
+	public int nivelActual = 0;
+	public int contadorTab = 0;
+:}
+
+/* Terminales */
+terminal            MAS, MENOS, POR, DIV, DIV_ENT, MODULO, POTENCIA, UMENOS;
+terminal            AP, CP, AC, CC;
+terminal            PYC, DOSPUNTOS;
+terminal			GT, GTE, LT, LTE, EQ, DIST;
+terminal 			AND, OR, NOT, ASIG;
+terminal Integer    ENTERO;
+terminal String    	IDENT;
+
+terminal            COMENT, COMENT_MULT;
+
+terminal			IF, ELSE;
+terminal 			WHILE, DO, FOR;
+terminal 			PRINT;
+terminal            INT;
+
+terminal            TAB;
+
+/* No terminales */
+non terminal listaSent;
+non terminal inicio;
+non terminal sent;
+non terminal BloqueCondicion cond;
+non terminal opcional;
+non terminal String exp;
+non terminal ltab;
+non terminal listaTabSent;
+
+
+/* Precedencia */
+precedence left IF;
+precedence left ELSE;
+precedence right TAB;
+
+precedence left AND, OR;
+precedence right NOT;
+
+precedence left MAS, MENOS;
+precedence left POR, DIV;
+precedence right UMENOS;
+
+/* Gramatica */
+inicio ::= listaSent {: print("\thalt;"); :}
+        ;    
+
+listaSent ::= listaSent sent 
+            | sent
+            ;
+            
+listaTabSent ::= listaTabSent ltab sent  {: contadorTab = 0; :}
+               | ltab sent               {: contadorTab = 0; :}
+               ;
+
+sent  ::= exp:e         {: RESULT = e; :}
+        | IF:f cond:c  DOSPUNTOS {:  RESULT = f; 
+                                     print(c.labCierto+":");
+                                     contadorTab = 0;
+                                     nivelActual++;
+                      			 :} 
+          listaTabSent           {: AuxPyPL.printNivel(nivelActual);  
+                                    print("\tgoto "+ RESULT +";");
+      	 					        print(c.labFalso+":");
+      	 				         :}
+      	  opcional		         {: print(f+":");
+      	                            AuxPyPL.borrarNivel(nivelActual);
+      	                            nivelActual--;
+      	                         :}
+        
+        | PRINT AP exp:e CP     {:                         
+                                    RESULT = nuevaTmp();
+							        String instr= "\tprint "+e+";";
+                                    AuxPyPL.nuevaInstruccion(instr, contadorTab, nivelActual);
+					            :}
+
+		;
+		
+ltab ::= TAB ltab   {: RESULT = contadorTab++; :} 
+       | TAB        {: RESULT = contadorTab++; :}
+       ;
+		
+opcional ::= ELSE sent      %prec ELSE
+		   | /* EPSILON */  %prec IF
+		   ;
+
+exp	  ::= exp:e1 MAS exp:e2     {: 
+                                       RESULT = nuevaTmp();
+								       String instr= "\t"+RESULT+" = "+e1+" + "+e2+";";
+								       AuxPyPL.nuevaInstruccion(instr, contadorTab, nivelActual);
+                               :}
+        | exp:e1 MENOS exp:e2   {:
+                                        RESULT = nuevaTmp();
+								        String instr= "\t"+RESULT+" = "+e1+" - "+e2+";";
+								        AuxPyPL.nuevaInstruccion(instr, contadorTab, nivelActual);
+								:}
+        | exp:e1 POR exp:e2     {:
+                                       RESULT = nuevaTmp();
+								       String instr= "\t"+RESULT+" = "+e1+" * "+e2+";";
+								       AuxPyPL.nuevaInstruccion(instr, contadorTab, nivelActual);
+								:}
+        | exp:e1 DIV exp:e2     {:
+                                       RESULT = nuevaTmp();
+								       String instr= "\t"+RESULT+" = "+e1+" / "+e2+";";
+								       AuxPyPL.nuevaInstruccion(instr, contadorTab, nivelActual);
+							    :}
+        | MENOS exp:e           {:
+                                        RESULT = nuevaTmp();
+								        String instr= "\t"+RESULT+" = -"+e+";";
+								        AuxPyPL.nuevaInstruccion(instr, contadorTab, nivelActual);
+								:} %prec UMENOS
+        | AP exp:e1 CP          {: 
+                                        RESULT = e1;
+                                :}
+    	| IDENT:id ASIG exp:e 	{: 
+        	                            RESULT = id;
+    	                                String instr = "\t"+id +" = "+ e +";";
+    	                                AuxPyPL.nuevaInstruccion(instr, contadorTab, nivelActual);
+    	                        :}
+    	| IDENT:id				{: 
+    	                            RESULT = id;
+    	                        :}
+    	| ENTERO:n              {:
+   	                                RESULT = n+"";
+    	                        :}
+        ;
+        
+cond  ::= exp:e1 EQ exp:e2		{: RESULT = BloqueCondicion.generarCondicion(e1, "==", e2); :} 
+        | exp:e1 DIST exp:e2  	{: RESULT = BloqueCondicion.generarCondicion(e1, "!=", e2); :} 
+        | exp:e1 LT exp:e2    	{: RESULT = BloqueCondicion.generarCondicion(e1, "<", e2); :} 
+		| exp:e1 GT exp:e2    	{: RESULT = BloqueCondicion.generarCondicion(e2, "<", e1); :} 
+        | exp:e1 LTE exp:e2     {: RESULT = BloqueCondicion.generarCondicionCompuesta(e1, e2); :} 
+        | exp:e1 GTE exp:e2   	{: RESULT = BloqueCondicion.generarCondicionCompuesta(e2, e1); :} 
+        | NOT cond:c			{: RESULT = new BloqueCondicion(); 
+        						   RESULT.labCierto = c.labFalso;
+        						   RESULT.labFalso = c.labCierto;	
+        						:}
+        | cond:c1 AND 			{: RESULT = new BloqueCondicion();
+                                   RESULT.labCierto = c1.labCierto;
+                                   RESULT.labFalso = c1.labFalso;
+                                   print(c1.labCierto+":"); 
+                                :}
+          cond:c2 				{: RESULT = new BloqueCondicion();
+                                   RESULT.labCierto = c2.labCierto;
+                                   RESULT.labFalso = c2.labFalso;
+                                   print(c1.labFalso+":");
+        						   print("\tgoto "+ c2.labFalso+";"); 
+        						:}
+        | cond:c1 OR 			{: RESULT = new BloqueCondicion();
+                                   RESULT.labCierto = c1.labCierto;
+                                   RESULT.labFalso = c1.labFalso;
+                                   print(c1.labFalso+":"); 
+                                :}
+          cond:c2 				{: RESULT = new BloqueCondicion();
+                                   RESULT.labCierto = c2.labCierto;
+                                   RESULT.labFalso = c2.labFalso;
+                                   print(c1.labCierto+":");
+        						   print("\tgoto "+ c2.labCierto+";"); 
+        						:}
+		;
+      

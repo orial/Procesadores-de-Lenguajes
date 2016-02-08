@@ -1,0 +1,11 @@
+   i = 3;
+L0:
+   if (i < 5) goto L1;
+   goto L2;
+L1:
+   print i;
+   $t0 = i + 1;
+   i = $t0;
+   goto L0;
+L2:
+   print i;

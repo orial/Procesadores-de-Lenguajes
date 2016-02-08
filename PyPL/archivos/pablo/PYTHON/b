@@ -1,0 +1,11 @@
+#holaxddx
+if a >= 22:
+	if a > 3:
+		print(a-22)
+	print(8)
+'''
+LA
+MUSICA
+SE
+COMPLICA
+'''

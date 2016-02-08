@@ -1,0 +1,118 @@
+// Calculadora (version 2) 
+import java_cup.runtime.*;
+
+action code {: private static int contador = 0;  
+	private static int current = 0;
+	private static int nivel = 0;
+
+
+	public void print(String s){
+	PLC.out.println(s);
+	}
+	:};
+
+
+/* Terminales */
+terminal            MAS, MENOS, POR, DIV, MENOSUNARIO, IGUAL;
+terminal            AP, CP, ALL, CLL;
+terminal	    MENOROIGUAL, IGUALQUE, MENORQUE, MAYORQUE, MAYOROIGUAL, NOTEQUAL, IF;
+terminal	    ELSE;
+terminal	    AND, OR;
+terminal            PYC;
+terminal	    PRINT;
+terminal	    FOR;
+terminal 	    WHILE;
+terminal	    CORCHETE, TAB, COM, POTENCIA, DP, FINAL, COCINA, COMA, EN, ELIF;
+terminal String    NUMERO;
+terminal String    VAR_NAME;
+
+/* No terminales */
+non terminal	     beginn;
+non terminal         listaExp;
+non terminal         linea;
+non terminal Label    cond;
+non terminal	     insideIf;
+non terminal	     llaves;
+non terminal	     printExp;
+non terminal	     decExp;
+non terminal	     ifExp;
+non terminal         apAUX;
+non terminal 	     elseExp;
+non terminal	     forExp;
+non terminal	     tabulaciones, lineatabulada, tabulador;
+non terminal String exp;
+
+
+/* Precedencia */
+precedence left MAS, MENOS;
+precedence left POR, DIV, POTENCIA;
+precedence left MENOSUNARIO;
+precedence left ELSE;
+precedence left IF, ELIF;
+precedence left AND;
+precedence left OR;
+precedence left TAB;
+
+/* Gramatica */
+beginn	      ::= listaExp	{: PLC.out.println("   halt;"); :}
+		;	
+listaExp      ::=  listaExp  linea 
+                 |  linea 
+                 ;
+lineatabulada ::= lineatabulada tabulador linea {: current = 0; :}
+                 | tabulador linea              {: current = 0; :}
+		 ;	
+tabulador     ::= TAB				{: current++; :}
+		| TAB tabulador			{: current++; :}
+		;
+linea	      ::= PRINT AP exp:e CP             {: Python.check("   print "+e+";",nivel,current); current = 0; :}
+	        | VAR_NAME:w IGUAL exp:e  	{: Python.check("   "+w+" = "+e+";",nivel,current); current = 0; :}
+
+		| IF:etq cond:s DP     {: nivel++; RESULT = etq; PLC.out.println(s.getEv()+":"); current = 0; :}
+		  lineatabulada	{: PLC.out.println("   goto "+etq+";");PLC.out.println(s.getEf()+":");:}	
+		  elseExp		{: PLC.out.println(etq+":"); nivel--; Python.printLevel(nivel); Python.deleteLevel(nivel); current = 0; :}
+		| FOR:etq 		
+ 		 VAR_NAME:e1 EN COCINA AP NUMERO:n1  	        {:nivel++; print("   "+e1+" = "+n1); PLC.out.println(etq+":"); :}
+		 COMA NUMERO:n2	{: RESULT = Etiqueta.call(); print("   if("+e1+" < "+n2+") goto "+RESULT); print("   t"+contador+" = "+e1+" + 1;"); print("   "+e1+" = t"+contador+";"); contador++; :}
+		 CP DP lineatabulada	{: PLC.out.println("   goto "+etq+";"); PLC.out.println(RESULT+":"); nivel--; Python.printLevel(nivel); Python.deleteLevel(nivel); current = 0; :}	
+		
+		| WHILE:etq 	{: nivel++; PLC.out.println(etq+":"); :}
+		  cond:c1 DP	{: PLC.out.println(c1.getEv()+":");:}
+		  lineatabulada		{: PLC.out.println("   goto "+etq+";"); PLC.out.println(c1.getEf()+":"); nivel--; Python.printLevel(nivel); Python.deleteLevel(nivel); current = 0;:}
+                ;
+elseExp   ::= ELSE DP lineatabulada	{: :}
+	   | ELIF:etq cond:s DP {: RESULT = etq; PLC.out.println(s.getEv()+":"); current = 0; :}
+		lineatabulada	{: PLC.out.println("   goto "+etq+";");PLC.out.println(s.getEf()+":");:}	
+		elseExp		{: PLC.out.println(etq+":"); Python.printLevel(nivel); Python.deleteLevel(nivel); current = 0; :}
+	   | 
+;		
+cond      ::= exp:e1 MAYOROIGUAL:c exp:e2	{:RESULT = Etiqueta.generar(e1,e2,">="); :}
+	    | exp:e1 MAYORQUE:c exp:e2		{:RESULT = Etiqueta.generar(e2,e1,"<"); :}
+	    | exp:e1 NOTEQUAL:c	exp:e2		{:RESULT = Etiqueta.generar(e1,e2,"!="); :}
+	    | exp:e1 MENORQUE:c exp:e2		{:RESULT = Etiqueta.generar(e1,e2,"<"); :}	
+	    | exp:e1 MENOROIGUAL:c exp:e2	{:RESULT = Etiqueta.generar(e1,e2,"<="); :}
+	    | exp:e1 IGUALQUE:c	exp:e2		{:RESULT = Etiqueta.generar(e1,e2,"=="); :}
+	    | cond:c1 	AND			{: PLC.out.println(c1.getEv()+":"); :}
+	      cond:c2				{: PLC.out.println(c1.getEf()); PLC.out.println("    goto "+c2.getEf()+";"); RESULT = c2;:}
+	    | cond:c1 OR 			{: PLC.out.println(c1.getEf()+":"); :}
+		cond:c2				{: PLC.out.println(c1.getEv()+":");  PLC.out.println("    goto "+c2.getEv()+";"); RESULT = c2;:}
+;
+
+
+exp       ::= exp:e1 MAS exp:e2     {: Python.check("   t"+contador+" = "+e1+" + "+e2+";",nivel,current);  RESULT = "t"+contador; contador++; :}
+            | exp:e1 MENOS exp:e2   {: Python.check("   t"+contador+" = "+e1+" - "+e2+";",nivel,current);  RESULT = "t"+contador; contador++;  :}
+            | exp:e1 POTENCIA exp:e2   {: 
+					 Python.check("   t"+contador+" = "+e1+" * "+e1+";",nivel,current); contador++; 
+					 for(int fs = 2; fs < Integer.parseInt(e2); fs++){
+					Python.check("   t"+contador+" = t"+(contador-1)+" * "+e1+";",nivel,current); contador++; } contador--;
+  		RESULT = "t"+contador; contador++;  :}
+            | exp:e1 POR exp:e2     {: Python.check("   t"+contador+" = "+e1+" * "+e2+";",nivel,current);  RESULT = "t"+contador; contador++; :}
+            | exp:e1 DIV exp:e2     {: Python.check("   t"+contador+" = "+e1+" / "+e2+";",nivel,current);  RESULT = "t"+contador; contador++; :}
+	    | MENOS exp:e1          {: Python.check("   t"+contador+" = 0"+" - "+e1+";",nivel,current);  RESULT = "t"+contador; contador++; :}
+            | AP exp:e1 CP          {: RESULT = e1; :}
+	        | NUMERO:n              {: RESULT = ""+n; :}
+		| VAR_NAME:n		{: RESULT = n; :}
+		| VAR_NAME:n IGUAL exp:e		{:Python.check("   "+n+" = "+e+";",nivel,current); RESULT = n;  :}
+	        ;
+
+

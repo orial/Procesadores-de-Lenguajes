@@ -1,0 +1,20 @@
+   a = 5;
+   if (0 < a) goto L0;
+   goto L1;
+L0:
+   $t0 = a + a;
+   print $t0;
+   if (10 < a) goto L3;
+   goto L4;
+L3:
+   $t1 = a * a;
+   print $t1;
+   $t2 = a / a;
+   print $t2;
+   goto L5;
+L4:
+L5:
+   goto L2;
+L1:
+L2:
+   print a;

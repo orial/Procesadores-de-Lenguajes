@@ -1,0 +1,84 @@
+import java_cup.runtime.*;
+
+/*Terminales */
+
+terminal            MAS, MENOS, POR, DIV, ASIG, MENOSUNARIO, POW, MOD;
+terminal            AP, CP, PYC, COMA, DOSPUNTOS;
+terminal     String IDENT; 
+terminal    Integer NUMERO;
+terminal            PRINT;
+terminal     String IF;
+terminal            ELSE, ELIF;
+terminal            MEN, MAY, MENIG, MAYIG;
+terminal            IG, NIG;
+terminal     String WHILE;
+terminal     String FOR, IN, RANGE;
+terminal 			INDENT, DEDENT;
+terminal 			FULLSTOP;
+terminal 			NEWLINE;
+
+/* Non terminales */
+
+non terminal        lista_de_sent;
+non terminal        sentencia;
+non terminal String expresion;
+non terminal    Tag cond; 
+non terminal        elsePart;
+
+/* Precedencia */
+
+precedence  left COMA; 				
+precedence right ASIG; 				
+precedence  left MAS, MENOS;
+precedence  left POR, DIV, MOD;
+precedence  left MENOSUNARIO;
+precedence  left IF;
+precedence  left ELSE;
+
+/* Gramatica */
+
+lista_de_sent       ::= sentencia
+			       	|  	lista_de_sent sentencia
+			        ;
+sentencia		   ::= 	expresion:e 	                	{: :}
+          // PRINT
+	 				|	PRINT AP expresion:e CP 		    {: Generador.print(e); :}
+	 	  // Anonymous block
+	 				|	INDENT lista_de_sent DEDENT			{: :}
+		  // IF - ELSE (optional)
+					|	IF:finIf cond:c DOSPUNTOS          	{: Generador.label(c.getV()); :}	
+                        sentencia                           {: Generador.goTo(finIf); Generador.label(c.getF()); :}       
+                        elsePart			                {: Generador.label(finIf); :}
+		  // WHILE
+					|	WHILE:inWhile   		            {: Generador.label(inWhile); :}                                 
+			            cond:c DOSPUNTOS		            {: Generador.label(c.getV()); :}
+			            sentencia                			{: Generador.goTo(inWhile); Generador.label(c.getF()); :}
+		  // FOR
+			        
+	 				;
+elsePart 	       ::= 	ELSE DOSPUNTOS sentencia            %prec ELSE
+	   	            |  /* EPSILON */                      	%prec IF
+	   	             ;
+expresion   	   ::=	expresion:e1 MAS expresion:e2       {: RESULT = Generador.aritmetica(e1 + " + " + e2); :}		
+		            |	expresion:e1 MENOS expresion:e2     {: RESULT = Generador.aritmetica(e1 + " - " + e2); :}
+		            |	expresion:e1 POR expresion:e2       {: RESULT = Generador.aritmetica(e1 + " * " + e2); :}
+		            | 	expresion:e1 DIV expresion:e2       {: RESULT = Generador.aritmetica(e1 + " / " + e2); :}
+		            |	expresion:e1 MOD expresion:e2		{:
+											                    String t1 = Generador.aritmetica(e1 + " / " + e2);
+								               					String t2 = Generador.aritmetica(t1 + " * " + e2);
+								               					RESULT = Generador.aritmetica(e1 + " - " + t2);;
+										                    :}
+		            | 	MENOS expresion:e		            {: RESULT = Generador.aritmetica(" -" + e); :}     %prec MENOSUNARIO
+		            | 	AP expresion:e CP	                {: RESULT = e; :}       
+                    |	IDENT:i ASIG expresion:e		    {: RESULT = Generador.asignacion(i, e); :}
+                    |	IDENT:i			                	{: RESULT = i; :}
+                    |  	NUMERO:n                            {: RESULT = n.toString(); :}
+                    ;
+cond     	       ::=	expresion:e1 IG expresion:e2		{: RESULT = Generador.condicion(e1, Tag.IG, e2); :}
+		            |	expresion:e1 NIG expresion:e2		{: RESULT = Generador.condicion(e1, Tag.NIG, e2); :}
+		            | 	expresion:e1 MEN expresion:e2		{: RESULT = Generador.condicion(e1, Tag.MEN, e2); :}
+		            |	expresion:e1 MENIG expresion:e2		{: RESULT = Generador.condicion(e1, Tag.MENIG, e2); :} 
+		            | 	expresion:e1 MAY expresion:e2		{: RESULT = Generador.condicion(e1, Tag.MAY, e2); :}
+		            | 	expresion:e1 MAYIG expresion:e2		{: RESULT = Generador.condicion(e1, Tag.MAYIG, e2); :}
+                   /* |	cond:c 				    	        {: RESULT = c; :}*/
+		            ;

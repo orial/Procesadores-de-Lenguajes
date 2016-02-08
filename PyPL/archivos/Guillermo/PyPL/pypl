@@ -1,0 +1,7 @@
+#!/bin/bash
+cup *cup
+jflex *flex
+javac *java
+clear
+java PyPL "$1" out
+cat out
